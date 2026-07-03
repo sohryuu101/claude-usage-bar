@@ -27,7 +27,13 @@ final class UsageMonitor: ObservableObject {
     }
 
     func refresh() {
-        aggregate = store.load()
+        let store = self.store
+        Task {
+            let newAggregate = await Task.detached {
+                return store.load()
+            }.value
+            self.aggregate = newAggregate
+        }
     }
 
     private func formatCompact(_ value: Int) -> String {

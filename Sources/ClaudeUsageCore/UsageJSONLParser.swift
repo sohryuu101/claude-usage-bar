@@ -39,12 +39,21 @@ public struct UsageJSONLParser: Sendable {
         )
         guard tokens.total > 0 else { return nil }
 
-        let timestampText = (object["timestamp"] as? String) ?? (object["_audit_timestamp"] as? String)
-        guard let timestamp = timestampText.flatMap(parseDate) else { return nil }
+        var timestamp: Date? = nil
+        if let tsString = object["timestamp"] as? String {
+            timestamp = parseDate(tsString)
+        } else if let tsNum = object["timestamp"] as? Double {
+            timestamp = Date(timeIntervalSince1970: tsNum > 1_000_000_000_000 ? tsNum / 1000.0 : tsNum)
+        } else if let auditTsString = object["_audit_timestamp"] as? String {
+            timestamp = parseDate(auditTsString)
+        } else if let auditTsNum = object["_audit_timestamp"] as? Double {
+            timestamp = Date(timeIntervalSince1970: auditTsNum > 1_000_000_000_000 ? auditTsNum / 1000.0 : auditTsNum)
+        }
+        guard let validTimestamp = timestamp else { return nil }
 
         return UsageRecord(
             source: source,
-            timestamp: timestamp,
+            timestamp: validTimestamp,
             model: message["model"] as? String ?? "unknown",
             tokens: tokens
         )

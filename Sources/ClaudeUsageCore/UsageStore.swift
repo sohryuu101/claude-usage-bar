@@ -33,10 +33,18 @@ public struct UsageStore {
 
     public func loadAccountSnapshot() -> CacheSnapshot? {
         let cacheRoot = homeDirectory.appendingPathComponent("Library/Application Support/Claude/Cache/Cache_Data")
-        return regularFiles(under: cacheRoot)
-            .compactMap { CacheSnapshotParser().parseFile(at: $0) }
-            .sorted { ($0.capturedAt ?? .distantPast) > ($1.capturedAt ?? .distantPast) }
-            .first
+        let files = regularFiles(under: cacheRoot)
+        let sortedFiles = files.sorted {
+            let date1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let date2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return date1 > date2
+        }
+        for file in sortedFiles.prefix(500) {
+            if let snapshot = CacheSnapshotParser().parseFile(at: file) {
+                return snapshot
+            }
+        }
+        return nil
     }
 
     private func jsonlFiles(under root: URL) -> [URL] {

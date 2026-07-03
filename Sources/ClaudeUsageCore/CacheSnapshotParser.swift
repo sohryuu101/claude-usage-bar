@@ -36,10 +36,10 @@ public struct CacheSnapshotParser: Sendable {
     }
 
     private func findJSONObject(in text: String, requiring keys: [String]) -> [String: Any]? {
-        return findJSONObject(in: text, requiringOneOf: keys, andOneOf: [])
+        return findJSONObject(in: text, requiringOneOf: keys, requireAllSet1: true, andOneOf: [])
     }
 
-    private func findJSONObject(in text: String, requiringOneOf set1: [String], andOneOf set2: [String]) -> [String: Any]? {
+    private func findJSONObject(in text: String, requiringOneOf set1: [String], requireAllSet1: Bool = false, andOneOf set2: [String]) -> [String: Any]? {
         let scalars = Array(text.unicodeScalars)
         for start in scalars.indices where scalars[start] == "{" {
             var depth = 0
@@ -51,7 +51,12 @@ public struct CacheSnapshotParser: Sendable {
                     if let data = candidate.data(using: .utf8),
                        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                         
-                        let hasSet1 = set1.isEmpty || set1.contains(where: { object.keys.contains($0) })
+                        let hasSet1: Bool
+                        if requireAllSet1 {
+                            hasSet1 = set1.allSatisfy { object.keys.contains($0) }
+                        } else {
+                            hasSet1 = set1.isEmpty || set1.contains(where: { object.keys.contains($0) })
+                        }
                         let hasSet2 = set2.isEmpty || set2.contains(where: { object.keys.contains($0) })
                         
                         if hasSet1 && hasSet2 {
