@@ -51,17 +51,12 @@ struct UsageMenuView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    row(title: "Account Snapshot", value: "Unavailable")
-                    Text("Open Claude settings usage once to refresh the local app cache.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             if let design = monitor.aggregate.designSnapshot {
-                Divider()
+                if monitor.aggregate.accountSnapshot != nil {
+                    Divider()
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     row(title: design.kind.rawValue, value: "\(design.percentUsed)% used")
                     ProgressView(value: design.used, total: max(design.limit, 1))
@@ -71,6 +66,57 @@ struct UsageMenuView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            let showSub = monitor.aggregate.subscriptionSnapshot != nil || monitor.aggregate.last5Hours.messages > 0
+            if showSub {
+                if monitor.aggregate.accountSnapshot != nil || monitor.aggregate.designSnapshot != nil {
+                    Divider()
+                }
+                let planName = monitor.aggregate.subscriptionSnapshot?.plan?.capitalized ?? "Pro"
+                let messagesUsed = monitor.aggregate.last5Hours.messages
+                let limit = estimated5HourLimit(for: monitor.aggregate.subscriptionSnapshot?.plan)
+                let percent = limit > 0 ? Int((Double(messagesUsed) / Double(limit) * 100).rounded()) : 0
+                VStack(alignment: .leading, spacing: 6) {
+                    row(title: "Claude \(planName)", value: "\(messagesUsed) of \(limit) messages (\(percent)%)")
+                    ProgressView(value: Double(messagesUsed), total: Double(max(limit, 1)))
+                        .tint(planColor(for: monitor.aggregate.subscriptionSnapshot?.plan, used: messagesUsed, total: limit))
+                    Text("Sliding 5-hour message quota (estimated)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if monitor.aggregate.accountSnapshot == nil &&
+               monitor.aggregate.designSnapshot == nil &&
+               !showSub {
+                VStack(alignment: .leading, spacing: 4) {
+                    row(title: "Account Snapshot", value: "Unavailable")
+                    Text("Open Claude settings usage once to refresh the local app cache.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func estimated5HourLimit(for plan: String?) -> Int {
+        switch plan?.lowercased() {
+        case "free": return 15
+        case "pro": return 45
+        case "max": return 100
+        default: return 45
+        }
+    }
+
+    private func planColor(for plan: String?, used: Int, total: Int) -> Color {
+        let percent = Double(used) / Double(total)
+        if percent >= 0.8 {
+            return .red
+        }
+        switch plan?.lowercased() {
+        case "free": return .gray
+        case "max": return .orange
+        default: return .purple
         }
     }
 

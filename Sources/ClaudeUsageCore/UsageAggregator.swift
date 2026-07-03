@@ -11,13 +11,16 @@ public struct UsageAggregator: Sendable {
         records: [UsageRecord],
         accountSnapshot: CacheSnapshot? = nil,
         designSnapshot: CacheSnapshot? = nil,
+        subscriptionSnapshot: CacheSnapshot? = nil,
         now: Date = Date()
     ) -> UsageAggregate {
         var today = UsageBucket()
         var month = UsageBucket()
+        var last5Hours = UsageBucket()
         var bySource: [UsageSource: UsageBucket] = [:]
         let currentMonth = calendar.component(.month, from: now)
         let currentYear = calendar.component(.year, from: now)
+        let fiveHoursAgo = now.addingTimeInterval(-5 * 60 * 60)
 
         for record in records {
             bySource[record.source, default: UsageBucket()].add(record)
@@ -28,15 +31,20 @@ public struct UsageAggregator: Sendable {
                calendar.component(.year, from: record.timestamp) == currentYear {
                 month.add(record)
             }
+            if record.timestamp >= fiveHoursAgo {
+                last5Hours.add(record)
+            }
         }
 
         return UsageAggregate(
             today: today,
             month: month,
+            last5Hours: last5Hours,
             bySource: bySource,
             records: records,
             accountSnapshot: accountSnapshot,
             designSnapshot: designSnapshot,
+            subscriptionSnapshot: subscriptionSnapshot,
             refreshedAt: now
         )
     }

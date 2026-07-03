@@ -47,6 +47,29 @@ if let design = aggregate.designSnapshot {
     print("")
 }
 
+let showSub = aggregate.subscriptionSnapshot != nil || aggregate.last5Hours.messages > 0
+if showSub {
+    let planName = aggregate.subscriptionSnapshot?.plan?.capitalized ?? "Pro"
+    let messagesUsed = aggregate.last5Hours.messages
+    
+    let limit: Int
+    switch aggregate.subscriptionSnapshot?.plan?.lowercased() {
+    case "free": limit = 15
+    case "pro": limit = 45
+    case "max": limit = 100
+    default: limit = 45
+    }
+    
+    let percent = limit > 0 ? Int((Double(messagesUsed) / Double(limit) * 100).rounded()) : 0
+    print("Subscription Status (\(planName)):")
+    print("  Messages sent (last 5h): \(messagesUsed) of \(limit)")
+    print("  (\(percent)% used)")
+    if let date = aggregate.subscriptionSnapshot?.capturedAt {
+        print("  Cached: \(date)")
+    }
+    print("")
+}
+
 print("Local Activity:")
 print("  Today:      \(formatTokens(aggregate.today.tokens.total)) (\(aggregate.today.messages) messages)")
 print("  This Month: \(formatTokens(aggregate.month.tokens.total)) (\(aggregate.month.messages) messages)")

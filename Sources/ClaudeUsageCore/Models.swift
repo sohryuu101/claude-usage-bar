@@ -55,12 +55,14 @@ public struct CacheSnapshot: Equatable, Sendable {
     public var kind: CacheSnapshotKind
     public var used: Double
     public var limit: Double
+    public var plan: String?
     public var capturedAt: Date?
 
-    public init(kind: CacheSnapshotKind, used: Double, limit: Double, capturedAt: Date? = nil) {
+    public init(kind: CacheSnapshotKind, used: Double, limit: Double, plan: String? = nil, capturedAt: Date? = nil) {
         self.kind = kind
         self.used = used
         self.limit = limit
+        self.plan = plan
         self.capturedAt = capturedAt
     }
 
@@ -88,27 +90,33 @@ public struct UsageBucket: Equatable, Sendable {
 public struct UsageAggregate: Equatable, Sendable {
     public var today: UsageBucket
     public var month: UsageBucket
+    public var last5Hours: UsageBucket
     public var bySource: [UsageSource: UsageBucket]
     public var records: [UsageRecord]
     public var accountSnapshot: CacheSnapshot?
     public var designSnapshot: CacheSnapshot?
+    public var subscriptionSnapshot: CacheSnapshot?
     public var refreshedAt: Date
 
     public init(
         today: UsageBucket,
         month: UsageBucket,
+        last5Hours: UsageBucket,
         bySource: [UsageSource: UsageBucket],
         records: [UsageRecord],
         accountSnapshot: CacheSnapshot? = nil,
         designSnapshot: CacheSnapshot? = nil,
+        subscriptionSnapshot: CacheSnapshot? = nil,
         refreshedAt: Date = Date()
     ) {
         self.today = today
         self.month = month
+        self.last5Hours = last5Hours
         self.bySource = bySource
         self.records = records
         self.accountSnapshot = accountSnapshot
         self.designSnapshot = designSnapshot
+        self.subscriptionSnapshot = subscriptionSnapshot
         self.refreshedAt = refreshedAt
     }
 }

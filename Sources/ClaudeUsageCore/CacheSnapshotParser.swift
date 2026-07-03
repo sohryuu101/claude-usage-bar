@@ -36,6 +36,14 @@ public struct CacheSnapshotParser: Sendable {
                 }
             }
         }
+
+        if text.contains("/paused_subscription_details") {
+            if let payload = findJSONObject(in: text, requiringOneOf: ["plan_type"], andOneOf: []) {
+                if let planType = payload["plan_type"] as? String {
+                    results.append(CacheSnapshot(kind: .subscriptionStatus, used: 0, limit: 0, plan: planType, capturedAt: capturedAt))
+                }
+            }
+        }
         
         return results
     }
@@ -44,6 +52,19 @@ public struct CacheSnapshotParser: Sendable {
         guard let data = try? Data(contentsOf: url) else {
             return []
         }
+        
+        let usagePattern = "/usage".data(using: .utf8)!
+        let subPattern = "/paused_subscription_details".data(using: .utf8)!
+        let budgetPattern = "/v1/code/routines/run-budget".data(using: .utf8)!
+        
+        let hasUsage = data.range(of: usagePattern) != nil
+        let hasSub = data.range(of: subPattern) != nil
+        let hasBudget = data.range(of: budgetPattern) != nil
+        
+        guard hasUsage || hasSub || hasBudget else {
+            return []
+        }
+        
         let modifiedAt = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date
         
         let zstdMagic = Data([0x28, 0xb5, 0x2f, 0xfd])

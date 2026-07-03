@@ -17,10 +17,12 @@ public struct UsageStore {
         let snapshots = loadAccountSnapshots()
         let primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
         let designSnapshot = snapshots.first { $0.kind == .designAllowance }
+        let subSnapshot = snapshots.first { $0.kind == .subscriptionStatus }
         return UsageAggregator().aggregate(
             records: records,
             accountSnapshot: primarySnapshot,
             designSnapshot: designSnapshot,
+            subscriptionSnapshot: subSnapshot,
             now: now
         )
     }
@@ -56,7 +58,8 @@ public struct UsageStore {
             }
             let hasPrimary = snapshots.contains { $0.kind == .runBudget || $0.kind == .usage }
             let hasDesign = snapshots.contains { $0.kind == .designAllowance }
-            if hasPrimary && hasDesign {
+            let hasSub = snapshots.contains { $0.kind == .subscriptionStatus }
+            if hasPrimary && hasDesign && hasSub {
                 break
             }
         }
