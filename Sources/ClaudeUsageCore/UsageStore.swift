@@ -46,7 +46,7 @@ public struct UsageStore {
     private func regularFiles(under root: URL) -> [URL] {
         guard let enumerator = fileManager.enumerator(
             at: root,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else {
             return []
@@ -54,8 +54,10 @@ public struct UsageStore {
 
         return enumerator.compactMap { item in
             guard let url = item as? URL,
-                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
-                  values.isRegularFile == true
+                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                  values.isRegularFile == true,
+                  let fileSize = values.fileSize,
+                  fileSize < 50_000_000 // Skip files larger than 50MB
             else {
                 return nil
             }

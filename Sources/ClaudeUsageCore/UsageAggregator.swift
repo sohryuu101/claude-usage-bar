@@ -13,23 +13,25 @@ public struct UsageAggregator: Sendable {
         now: Date = Date()
     ) -> UsageAggregate {
         var today = UsageBucket()
-        var week = UsageBucket()
+        var month = UsageBucket()
         var bySource: [UsageSource: UsageBucket] = [:]
-        let weekInterval = calendar.dateInterval(of: .weekOfYear, for: now)
+        let currentMonth = calendar.component(.month, from: now)
+        let currentYear = calendar.component(.year, from: now)
 
         for record in records {
             bySource[record.source, default: UsageBucket()].add(record)
             if calendar.isDate(record.timestamp, inSameDayAs: now) {
                 today.add(record)
             }
-            if let weekInterval, weekInterval.contains(record.timestamp) {
-                week.add(record)
+            if calendar.component(.month, from: record.timestamp) == currentMonth &&
+               calendar.component(.year, from: record.timestamp) == currentYear {
+                month.add(record)
             }
         }
 
         return UsageAggregate(
             today: today,
-            week: week,
+            month: month,
             bySource: bySource,
             records: records,
             accountSnapshot: accountSnapshot,

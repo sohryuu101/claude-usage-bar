@@ -62,7 +62,7 @@ struct UsageMenuView: View {
             Text("Local Activity")
                 .font(.headline)
             metricRow("Today", bucket: monitor.aggregate.today)
-            metricRow("This Week", bucket: monitor.aggregate.week)
+            metricRow("This Month", bucket: monitor.aggregate.month)
             ForEach(UsageSource.allCases, id: \.self) { source in
                 metricRow(source.rawValue, bucket: monitor.aggregate.bySource[source] ?? UsageBucket())
             }

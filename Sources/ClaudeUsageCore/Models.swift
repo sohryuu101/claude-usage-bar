@@ -86,7 +86,7 @@ public struct UsageBucket: Equatable, Sendable {
 
 public struct UsageAggregate: Equatable, Sendable {
     public var today: UsageBucket
-    public var week: UsageBucket
+    public var month: UsageBucket
     public var bySource: [UsageSource: UsageBucket]
     public var records: [UsageRecord]
     public var accountSnapshot: CacheSnapshot?
@@ -94,14 +94,14 @@ public struct UsageAggregate: Equatable, Sendable {
 
     public init(
         today: UsageBucket,
-        week: UsageBucket,
+        month: UsageBucket,
         bySource: [UsageSource: UsageBucket],
         records: [UsageRecord],
         accountSnapshot: CacheSnapshot? = nil,
         refreshedAt: Date = Date()
     ) {
         self.today = today
-        self.week = week
+        self.month = month
         self.bySource = bySource
         self.records = records
         self.accountSnapshot = accountSnapshot
