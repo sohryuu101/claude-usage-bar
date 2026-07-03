@@ -10,6 +10,7 @@ public struct UsageAggregator: Sendable {
     public func aggregate(
         records: [UsageRecord],
         accountSnapshot: CacheSnapshot? = nil,
+        designSnapshot: CacheSnapshot? = nil,
         now: Date = Date()
     ) -> UsageAggregate {
         var today = UsageBucket()
@@ -35,6 +36,7 @@ public struct UsageAggregator: Sendable {
             bySource: bySource,
             records: records,
             accountSnapshot: accountSnapshot,
+            designSnapshot: designSnapshot,
             refreshedAt: now
         )
     }

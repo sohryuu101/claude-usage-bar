@@ -14,7 +14,7 @@ struct ClaudeUsageBarApp: App {
         MenuBarExtra {
             UsageMenuView(monitor: monitor)
         } label: {
-            Label(monitor.menuTitle, systemImage: "chart.bar.fill")
+            Text(monitor.menuTitle)
         }
         .menuBarExtraStyle(.window)
     }

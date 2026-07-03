@@ -38,6 +38,15 @@ if let snapshot = aggregate.accountSnapshot {
     print("")
 }
 
+if let design = aggregate.designSnapshot {
+    print("Claude Design Included Allowance:")
+    print("  Used: \(Int(design.used))%")
+    if let date = design.capturedAt {
+        print("  Cached: \(date)")
+    }
+    print("")
+}
+
 print("Local Activity:")
 print("  Today:      \(formatTokens(aggregate.today.tokens.total)) (\(aggregate.today.messages) messages)")
 print("  This Month: \(formatTokens(aggregate.month.tokens.total)) (\(aggregate.month.messages) messages)")

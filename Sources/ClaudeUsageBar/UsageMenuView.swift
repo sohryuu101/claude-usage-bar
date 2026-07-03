@@ -39,20 +39,37 @@ struct UsageMenuView: View {
 
     @ViewBuilder
     private var accountSection: some View {
-        if let snapshot = monitor.aggregate.accountSnapshot {
-            VStack(alignment: .leading, spacing: 8) {
-                row(title: snapshot.kind.rawValue, value: "\(snapshot.percentUsed)%")
-                ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
-                Text("\(formatNumber(snapshot.used)) of \(formatNumber(snapshot.limit)) used\(freshnessText(snapshot))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            if let snapshot = monitor.aggregate.accountSnapshot {
+                VStack(alignment: .leading, spacing: 6) {
+                    row(title: snapshot.kind.rawValue, value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
+                    ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
+                        .tint(snapshot.percentUsed > 80 ? .orange : .blue)
+                    if let capturedAt = snapshot.capturedAt {
+                        Text("Cached \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    row(title: "Account Snapshot", value: "Unavailable")
+                    Text("Open Claude settings usage once to refresh the local app cache.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-        } else {
-            VStack(alignment: .leading, spacing: 4) {
-                row(title: "Account Snapshot", value: "Unavailable")
-                Text("Open Claude settings usage once to refresh the local app cache.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+            if let design = monitor.aggregate.designSnapshot {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    row(title: design.kind.rawValue, value: "\(design.percentUsed)% used")
+                    ProgressView(value: design.used, total: max(design.limit, 1))
+                        .tint(design.percentUsed >= 100 ? .red : .purple)
+                    Text("Included allowance for Claude Design (Canvas)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

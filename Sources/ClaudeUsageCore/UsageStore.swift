@@ -14,8 +14,15 @@ public struct UsageStore {
 
     public func load(now: Date = Date()) -> UsageAggregate {
         let records = loadRecords()
-        let snapshot = loadAccountSnapshot()
-        return UsageAggregator().aggregate(records: records, accountSnapshot: snapshot, now: now)
+        let snapshots = loadAccountSnapshots()
+        let primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
+        let designSnapshot = snapshots.first { $0.kind == .designAllowance }
+        return UsageAggregator().aggregate(
+            records: records,
+            accountSnapshot: primarySnapshot,
+            designSnapshot: designSnapshot,
+            now: now
+        )
     }
 
     public func loadRecords() -> [UsageRecord] {
@@ -31,7 +38,7 @@ public struct UsageStore {
         return (codeRecords + coworkRecords).sorted { $0.timestamp > $1.timestamp }
     }
 
-    public func loadAccountSnapshot() -> CacheSnapshot? {
+    public func loadAccountSnapshots() -> [CacheSnapshot] {
         let cacheRoot = homeDirectory.appendingPathComponent("Library/Application Support/Claude/Cache/Cache_Data")
         let files = regularFiles(under: cacheRoot)
         let sortedFiles = files.sorted {
@@ -39,12 +46,21 @@ public struct UsageStore {
             let date2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             return date1 > date2
         }
+        var snapshots: [CacheSnapshot] = []
         for file in sortedFiles.prefix(500) {
-            if let snapshot = CacheSnapshotParser().parseFile(at: file) {
-                return snapshot
+            let parsed = CacheSnapshotParser().parseFile(at: file)
+            for snapshot in parsed {
+                if !snapshots.contains(where: { $0.kind == snapshot.kind }) {
+                    snapshots.append(snapshot)
+                }
+            }
+            let hasPrimary = snapshots.contains { $0.kind == .runBudget || $0.kind == .usage }
+            let hasDesign = snapshots.contains { $0.kind == .designAllowance }
+            if hasPrimary && hasDesign {
+                break
             }
         }
-        return nil
+        return snapshots
     }
 
     private func jsonlFiles(under root: URL) -> [URL] {

@@ -48,6 +48,7 @@ public enum CacheSnapshotKind: String, Sendable {
     case runBudget = "Run Budget"
     case usage = "Usage"
     case subscriptionStatus = "Subscription"
+    case designAllowance = "Claude Design"
 }
 
 public struct CacheSnapshot: Equatable, Sendable {
@@ -90,6 +91,7 @@ public struct UsageAggregate: Equatable, Sendable {
     public var bySource: [UsageSource: UsageBucket]
     public var records: [UsageRecord]
     public var accountSnapshot: CacheSnapshot?
+    public var designSnapshot: CacheSnapshot?
     public var refreshedAt: Date
 
     public init(
@@ -98,6 +100,7 @@ public struct UsageAggregate: Equatable, Sendable {
         bySource: [UsageSource: UsageBucket],
         records: [UsageRecord],
         accountSnapshot: CacheSnapshot? = nil,
+        designSnapshot: CacheSnapshot? = nil,
         refreshedAt: Date = Date()
     ) {
         self.today = today
@@ -105,6 +108,7 @@ public struct UsageAggregate: Equatable, Sendable {
         self.bySource = bySource
         self.records = records
         self.accountSnapshot = accountSnapshot
+        self.designSnapshot = designSnapshot
         self.refreshedAt = refreshedAt
     }
 }

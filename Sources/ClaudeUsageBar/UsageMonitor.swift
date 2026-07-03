@@ -21,9 +21,9 @@ final class UsageMonitor: ObservableObject {
 
     var menuTitle: String {
         if let snapshot = aggregate.accountSnapshot {
-            return "\(snapshot.percentUsed)%"
+            return "🅒 \(snapshot.percentUsed)%"
         }
-        return formatCompact(aggregate.today.tokens.total)
+        return "🅒 \(formatCompact(aggregate.today.tokens.total))"
     }
 
     func refresh() {
