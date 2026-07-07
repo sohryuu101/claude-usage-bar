@@ -4,12 +4,20 @@ import Foundation
 @MainActor
 final class UsageMonitor: ObservableObject {
     @Published private(set) var aggregate: UsageAggregate
+    @Published var enableOAuthLiveQuota: Bool {
+        didSet {
+            if oldValue != enableOAuthLiveQuota {
+                refresh()
+            }
+        }
+    }
 
-    private let store: UsageStore
+    private var store: UsageStore
     private var timer: Timer?
 
     init(store: UsageStore = UsageStore()) {
         self.store = store
+        self.enableOAuthLiveQuota = UserDefaults.standard.bool(forKey: UsageSettings.enableOAuthLiveQuotaKey)
         self.aggregate = UsageAggregator().aggregate(records: [])
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -20,6 +28,10 @@ final class UsageMonitor: ObservableObject {
     }
 
     var menuTitle: String {
+        if let fiveHour = aggregate.liveQuota?.fiveHour {
+            return "🅒 \(Int(fiveHour.utilization.rounded()))%"
+        }
+
         let primary = aggregate.accountSnapshot
         let sub = aggregate.subscriptionSnapshot
 
@@ -54,10 +66,11 @@ final class UsageMonitor: ObservableObject {
     }
 
     func refresh() {
+        store.enableOAuthLiveQuota = enableOAuthLiveQuota
         let store = self.store
         Task {
             let newAggregate = await Task.detached {
-                return store.load()
+                return await store.loadAsync()
             }.value
             self.aggregate = newAggregate
         }

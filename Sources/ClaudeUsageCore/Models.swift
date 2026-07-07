@@ -35,12 +35,26 @@ public struct UsageRecord: Equatable, Sendable {
     public var timestamp: Date
     public var model: String
     public var tokens: TokenUsage
+    public var messageID: String?
+    public var requestID: String?
+    public var sessionID: String?
 
-    public init(source: UsageSource, timestamp: Date, model: String, tokens: TokenUsage) {
+    public init(
+        source: UsageSource,
+        timestamp: Date,
+        model: String,
+        tokens: TokenUsage,
+        messageID: String? = nil,
+        requestID: String? = nil,
+        sessionID: String? = nil
+    ) {
         self.source = source
         self.timestamp = timestamp
         self.model = model
         self.tokens = tokens
+        self.messageID = messageID
+        self.requestID = requestID
+        self.sessionID = sessionID
     }
 }
 
@@ -96,6 +110,8 @@ public struct UsageAggregate: Equatable, Sendable {
     public var accountSnapshot: CacheSnapshot?
     public var designSnapshot: CacheSnapshot?
     public var subscriptionSnapshot: CacheSnapshot?
+    public var liveQuota: OAuthUsageSnapshot?
+    public var liveQuotaStatus: OAuthLiveQuotaStatus
     public var refreshedAt: Date
 
     public init(
@@ -107,6 +123,8 @@ public struct UsageAggregate: Equatable, Sendable {
         accountSnapshot: CacheSnapshot? = nil,
         designSnapshot: CacheSnapshot? = nil,
         subscriptionSnapshot: CacheSnapshot? = nil,
+        liveQuota: OAuthUsageSnapshot? = nil,
+        liveQuotaStatus: OAuthLiveQuotaStatus = .unavailable,
         refreshedAt: Date = Date()
     ) {
         self.today = today
@@ -117,7 +135,51 @@ public struct UsageAggregate: Equatable, Sendable {
         self.accountSnapshot = accountSnapshot
         self.designSnapshot = designSnapshot
         self.subscriptionSnapshot = subscriptionSnapshot
+        self.liveQuota = liveQuota
+        self.liveQuotaStatus = liveQuotaStatus
         self.refreshedAt = refreshedAt
+    }
+}
+
+public enum OAuthLiveQuotaStatus: Equatable, Sendable {
+    case unavailable
+    case enabled
+    case unauthorized
+    case rateLimited
+}
+
+public struct OAuthQuotaBucket: Equatable, Sendable {
+    public var utilization: Double
+    public var resetsAt: Date?
+
+    public init(utilization: Double, resetsAt: Date? = nil) {
+        self.utilization = utilization
+        self.resetsAt = resetsAt
+    }
+}
+
+public struct OAuthUsageSnapshot: Equatable, Sendable {
+    public var fiveHour: OAuthQuotaBucket?
+    public var sevenDay: OAuthQuotaBucket?
+    public var sevenDayOAuthApps: OAuthQuotaBucket?
+    public var sevenDayOpus: OAuthQuotaBucket?
+    public var sevenDaySonnet: OAuthQuotaBucket?
+    public var fetchedAt: Date
+
+    public init(
+        fiveHour: OAuthQuotaBucket? = nil,
+        sevenDay: OAuthQuotaBucket? = nil,
+        sevenDayOAuthApps: OAuthQuotaBucket? = nil,
+        sevenDayOpus: OAuthQuotaBucket? = nil,
+        sevenDaySonnet: OAuthQuotaBucket? = nil,
+        fetchedAt: Date
+    ) {
+        self.fiveHour = fiveHour
+        self.sevenDay = sevenDay
+        self.sevenDayOAuthApps = sevenDayOAuthApps
+        self.sevenDayOpus = sevenDayOpus
+        self.sevenDaySonnet = sevenDaySonnet
+        self.fetchedAt = fetchedAt
     }
 }
 

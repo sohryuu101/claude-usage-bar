@@ -1,18 +1,55 @@
 import Foundation
 
-public struct UsageStore {
+public struct UsageStore: @unchecked Sendable {
     public var homeDirectory: URL
     public var fileManager: FileManager
+    public var enableOAuthLiveQuota: Bool
+    public var oauthCredentialProvider: any OAuthCredentialProvider
+    public var oauthClient: any OAuthUsageClient
 
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        enableOAuthLiveQuota: Bool = false,
+        oauthCredentialProvider: (any OAuthCredentialProvider)? = nil,
+        oauthClient: any OAuthUsageClient = OAuthUsageService()
     ) {
         self.homeDirectory = homeDirectory
         self.fileManager = fileManager
+        self.enableOAuthLiveQuota = enableOAuthLiveQuota
+        self.oauthCredentialProvider = oauthCredentialProvider ?? ClaudeCodeOAuthCredentialProvider(
+            homeDirectory: homeDirectory,
+            fileManager: fileManager
+        )
+        self.oauthClient = oauthClient
     }
 
     public func load(now: Date = Date()) -> UsageAggregate {
+        loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unavailable)
+    }
+
+    public func loadAsync(now: Date = Date()) async -> UsageAggregate {
+        guard enableOAuthLiveQuota, let token = oauthCredentialProvider.accessToken() else {
+            return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unavailable)
+        }
+
+        do {
+            let liveQuota = try await oauthClient.fetchUsage(accessToken: token, now: now)
+            return loadLocal(now: now, liveQuota: liveQuota, liveQuotaStatus: .enabled)
+        } catch OAuthUsageError.unauthorized {
+            return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unauthorized)
+        } catch OAuthUsageError.rateLimited {
+            return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .rateLimited)
+        } catch {
+            return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unavailable)
+        }
+    }
+
+    private func loadLocal(
+        now: Date,
+        liveQuota: OAuthUsageSnapshot?,
+        liveQuotaStatus: OAuthLiveQuotaStatus
+    ) -> UsageAggregate {
         let records = loadRecords()
         let snapshots = loadAccountSnapshots()
         let primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
@@ -23,17 +60,19 @@ public struct UsageStore {
             accountSnapshot: primarySnapshot,
             designSnapshot: designSnapshot,
             subscriptionSnapshot: subSnapshot,
+            liveQuota: liveQuota,
+            liveQuotaStatus: liveQuotaStatus,
             now: now
         )
     }
 
     public func loadRecords() -> [UsageRecord] {
-        let codeRoot = homeDirectory.appendingPathComponent(".claude/projects")
-        let coworkRoot = homeDirectory.appendingPathComponent("Library/Application Support/Claude/local-agent-mode-sessions")
+        let discovery = UsageSourceDiscovery(homeDirectory: homeDirectory, fileManager: fileManager)
 
-        let codeRecords = jsonlFiles(under: codeRoot)
+        let codeRecords = discovery.claudeCodeProjectRoots()
+            .flatMap { jsonlFiles(under: $0) }
             .flatMap { UsageJSONLParser(source: .claudeCode).parseFile(at: $0) }
-        let coworkRecords = jsonlFiles(under: coworkRoot)
+        let coworkRecords = jsonlFiles(under: discovery.desktopCoworkRoot())
             .filter { $0.lastPathComponent == "audit.jsonl" }
             .flatMap { UsageJSONLParser(source: .desktopCowork).parseFile(at: $0) }
 

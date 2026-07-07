@@ -8,7 +8,27 @@ public struct UsageJSONLParser: Sendable {
     }
 
     public func parseLines(_ lines: [String]) -> [UsageRecord] {
-        lines.compactMap(parseLine)
+        var records: [UsageRecord] = []
+        var indexesByKey: [String: Int] = [:]
+
+        for line in lines {
+            guard let record = parseLine(line) else {
+                continue
+            }
+
+            if let key = dedupeKey(for: record) {
+                if let existingIndex = indexesByKey[key] {
+                    records[existingIndex] = record
+                } else {
+                    indexesByKey[key] = records.count
+                    records.append(record)
+                }
+            } else {
+                records.append(record)
+            }
+        }
+
+        return records
     }
 
     public func parseFile(at url: URL) -> [UsageRecord] {
@@ -29,7 +49,7 @@ public struct UsageJSONLParser: Sendable {
 
         let input = intValue(usage["input_tokens"])
         let output = intValue(usage["output_tokens"])
-        let cacheCreation = intValue(usage["cache_creation_input_tokens"])
+        let cacheCreation = cacheCreationTokens(from: usage)
         let cacheRead = intValue(usage["cache_read_input_tokens"])
         let tokens = TokenUsage(
             input: input,
@@ -55,8 +75,32 @@ public struct UsageJSONLParser: Sendable {
             source: source,
             timestamp: validTimestamp,
             model: message["model"] as? String ?? "unknown",
-            tokens: tokens
+            tokens: tokens,
+            messageID: message["id"] as? String,
+            requestID: object["requestId"] as? String ?? object["request_id"] as? String,
+            sessionID: object["sessionId"] as? String ?? object["session_id"] as? String
         )
+    }
+
+    private func dedupeKey(for record: UsageRecord) -> String? {
+        if let messageID = record.messageID, !messageID.isEmpty {
+            return "message:\(messageID)"
+        }
+        if let requestID = record.requestID, !requestID.isEmpty {
+            return "request:\(requestID)"
+        }
+        return nil
+    }
+
+    private func cacheCreationTokens(from usage: [String: Any]) -> Int {
+        if let nested = usage["cache_creation"] as? [String: Any] {
+            let ephemeral5m = intValue(nested["ephemeral_5m_input_tokens"])
+            let ephemeral1h = intValue(nested["ephemeral_1h_input_tokens"])
+            if ephemeral5m > 0 || ephemeral1h > 0 {
+                return ephemeral5m + ephemeral1h
+            }
+        }
+        return intValue(usage["cache_creation_input_tokens"])
     }
 
     private func parseDate(_ text: String) -> Date? {

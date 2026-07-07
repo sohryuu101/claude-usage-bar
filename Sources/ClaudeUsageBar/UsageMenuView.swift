@@ -3,6 +3,7 @@ import SwiftUI
 
 struct UsageMenuView: View {
     @ObservedObject var monitor: UsageMonitor
+    @AppStorage(UsageSettings.enableOAuthLiveQuotaKey) private var enableOAuthLiveQuota = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -11,10 +12,18 @@ struct UsageMenuView: View {
             accountSection
             localSection
             Divider()
+            settingsSection
+            Divider()
             footer
         }
         .padding(18)
         .frame(width: 390)
+        .onAppear {
+            monitor.enableOAuthLiveQuota = enableOAuthLiveQuota
+        }
+        .onChange(of: enableOAuthLiveQuota) { _, newValue in
+            monitor.enableOAuthLiveQuota = newValue
+        }
     }
 
     private var header: some View {
@@ -40,13 +49,31 @@ struct UsageMenuView: View {
     @ViewBuilder
     private var accountSection: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let liveQuota = monitor.aggregate.liveQuota {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Live Quota")
+                        .font(.headline)
+                    quotaRow("5-hour", bucket: liveQuota.fiveHour)
+                    quotaRow("7-day", bucket: liveQuota.sevenDay)
+                    quotaRow("OAuth apps", bucket: liveQuota.sevenDayOAuthApps)
+                    quotaRow("Opus", bucket: liveQuota.sevenDayOpus)
+                    quotaRow("Sonnet", bucket: liveQuota.sevenDaySonnet)
+                    Text("Fetched \(liveQuota.fetchedAt.formatted(date: .omitted, time: .standard))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if let snapshot = monitor.aggregate.accountSnapshot {
+                if monitor.aggregate.liveQuota != nil {
+                    Divider()
+                }
                 VStack(alignment: .leading, spacing: 6) {
-                    row(title: snapshot.kind.rawValue, value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
+                    row(title: "\(snapshot.kind.rawValue) Cache", value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
                     ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
                         .tint(snapshot.percentUsed > 80 ? .orange : .blue)
                     if let capturedAt = snapshot.capturedAt {
-                        Text("Cached \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text("Stale fallback from \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -54,7 +81,7 @@ struct UsageMenuView: View {
             }
 
             if let design = monitor.aggregate.designSnapshot {
-                if monitor.aggregate.accountSnapshot != nil {
+                if monitor.aggregate.accountSnapshot != nil || monitor.aggregate.liveQuota != nil {
                     Divider()
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -69,7 +96,9 @@ struct UsageMenuView: View {
 
             let showSub = monitor.aggregate.subscriptionSnapshot != nil || monitor.aggregate.last5Hours.messages > 0
             if showSub {
-                if monitor.aggregate.accountSnapshot != nil || monitor.aggregate.designSnapshot != nil {
+                if monitor.aggregate.accountSnapshot != nil ||
+                    monitor.aggregate.designSnapshot != nil ||
+                    monitor.aggregate.liveQuota != nil {
                     Divider()
                 }
                 let planName = monitor.aggregate.subscriptionSnapshot?.plan?.capitalized ?? "Pro"
@@ -80,7 +109,7 @@ struct UsageMenuView: View {
                     row(title: "Claude \(planName)", value: "\(messagesUsed) of \(limit) messages (\(percent)%)")
                     ProgressView(value: Double(messagesUsed), total: Double(max(limit, 1)))
                         .tint(planColor(for: monitor.aggregate.subscriptionSnapshot?.plan, used: messagesUsed, total: limit))
-                    Text("Sliding 5-hour message quota (estimated)")
+                    Text("Sliding 5-hour message quota (local estimate)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -88,14 +117,43 @@ struct UsageMenuView: View {
 
             if monitor.aggregate.accountSnapshot == nil &&
                monitor.aggregate.designSnapshot == nil &&
+               monitor.aggregate.liveQuota == nil &&
                !showSub {
                 VStack(alignment: .leading, spacing: 4) {
-                    row(title: "Account Snapshot", value: "Unavailable")
+                    row(title: "Account Quota", value: "Unavailable")
                     Text("Open Claude settings usage once to refresh the local app cache.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Use Claude Code OAuth for live quota", isOn: $enableOAuthLiveQuota)
+            Text(oauthStatusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var oauthStatusText: String {
+        if !enableOAuthLiveQuota {
+            return "Unavailable"
+        }
+        switch monitor.aggregate.liveQuotaStatus {
+        case .enabled:
+            if let fetchedAt = monitor.aggregate.liveQuota?.fetchedAt {
+                return "Enabled · last fetched \(fetchedAt.formatted(date: .omitted, time: .standard))"
+            }
+            return "Enabled"
+        case .unauthorized:
+            return "Unauthorized"
+        case .rateLimited:
+            return "Rate limited"
+        case .unavailable:
+            return "Unavailable"
         }
     }
 
@@ -151,6 +209,20 @@ struct UsageMenuView: View {
             Text("\(bucket.messages) messages")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func quotaRow(_ title: String, bucket: OAuthQuotaBucket?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            let utilization = bucket?.utilization ?? 0
+            row(title: title, value: "\(Int(utilization.rounded()))%")
+            ProgressView(value: utilization, total: 100)
+                .tint(utilization >= 90 ? .red : utilization >= 75 ? .orange : .blue)
+            if let resetsAt = bucket?.resetsAt {
+                Text("Resets \(resetsAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
