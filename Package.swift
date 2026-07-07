@@ -16,7 +16,8 @@ let package = Package(
         .target(name: "ClaudeUsageCore"),
         .executableTarget(
             name: "ClaudeUsageBar",
-            dependencies: ["ClaudeUsageCore"]
+            dependencies: ["ClaudeUsageCore"],
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "ClaudeUsageCLI",

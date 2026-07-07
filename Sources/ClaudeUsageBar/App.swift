@@ -14,8 +14,22 @@ struct ClaudeUsageBarApp: App {
         MenuBarExtra {
             UsageMenuView(monitor: monitor)
         } label: {
-            Text(monitor.menuTitle)
+            HStack {
+                if let clawdImage = loadClawdIcon() {
+                    clawdImage
+                }
+                Text(monitor.menuTitle)
+            }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    private func loadClawdIcon() -> Image? {
+        guard let url = Bundle.module.url(forResource: "clawd", withExtension: "png"),
+              let nsImage = NSImage(contentsOf: url) else {
+            return nil
+        }
+        nsImage.size = NSSize(width: 17, height: 17)
+        return Image(nsImage: nsImage)
     }
 }

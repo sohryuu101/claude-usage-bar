@@ -30,7 +30,7 @@ final class UsageMonitor: ObservableObject {
 
     var menuTitle: String {
         if let fiveHour = aggregate.liveQuota?.fiveHour {
-            return "🅒 \(Int(fiveHour.utilization.rounded()))%"
+            return "\(Int(fiveHour.utilization.rounded()))%"
         }
 
         let primary = aggregate.accountSnapshot
@@ -46,15 +46,15 @@ final class UsageMonitor: ObservableObject {
         }
 
         if showPrimary, let snapshot = primary {
-            return "🅒 \(snapshot.percentUsed)%"
+            return "\(snapshot.percentUsed)%"
         } else if let subscription = sub {
             let messagesUsed = aggregate.last5Hours.messages
             let limit = estimated5HourLimit(for: subscription.plan)
             let percent = Int((Double(messagesUsed) / Double(limit) * 100).rounded())
-            return "🅒 \(percent)%"
+            return "\(percent)%"
         }
 
-        return "🅒 \(formatCompact(aggregate.today.tokens.total))"
+        return "\(formatCompact(aggregate.today.tokens.total))"
     }
 
     private func estimated5HourLimit(for plan: String?) -> Int {

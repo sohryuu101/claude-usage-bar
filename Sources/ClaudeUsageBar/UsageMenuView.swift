@@ -27,8 +27,16 @@ struct UsageMenuView: View {
     }
 
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            if let url = Bundle.module.url(forResource: "clawd", withExtension: "png"),
+               let nsImage = NSImage(contentsOf: url) {
+                let _ = nsImage.size = NSSize(width: 36, height: 36)
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 36, height: 36)
+            }
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Claude Usage")
                     .font(.title2.bold())
                 Text("Local monitor")
