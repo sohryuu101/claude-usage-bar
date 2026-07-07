@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 public enum OAuthUsageError: Error, Equatable, Sendable {
     case unauthorized
@@ -42,6 +43,12 @@ public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unche
     }
 
     public func accessToken() -> String? {
+        #if os(macOS)
+        if let token = fetchTokenFromKeychain() {
+            return token
+        }
+        #endif
+
         for file in candidateFiles() {
             guard let data = try? Data(contentsOf: file),
                   let object = try? JSONSerialization.jsonObject(with: data)
@@ -54,6 +61,29 @@ public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unche
         }
         return nil
     }
+
+    #if os(macOS)
+    private func fetchTokenFromKeychain() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "Claude Code-credentials",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var dataTypeRef: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
+        
+        guard status == errSecSuccess,
+              let data = dataTypeRef as? Data,
+              let object = try? JSONSerialization.jsonObject(with: data)
+        else {
+            return nil
+        }
+        
+        return findAccessToken(in: object)
+    }
+    #endif
 
     private func candidateFiles() -> [URL] {
         var directories = [homeDirectory.appendingPathComponent(".claude")]
