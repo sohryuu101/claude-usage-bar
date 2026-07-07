@@ -25,7 +25,9 @@ struct ClaudeUsageBarApp: App {
     }
 
     private func loadClawdIcon() -> Image? {
-        guard let url = Bundle.module.url(forResource: "clawd", withExtension: "png"),
+        let url = Bundle.main.url(forResource: "clawd", withExtension: "png") ??
+                  Bundle.module.url(forResource: "clawd", withExtension: "png")
+        guard let url = url,
               let nsImage = NSImage(contentsOf: url) else {
             return nil
         }

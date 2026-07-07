@@ -28,7 +28,8 @@ struct UsageMenuView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            if let url = Bundle.module.url(forResource: "clawd", withExtension: "png"),
+            if let url = Bundle.main.url(forResource: "clawd", withExtension: "png") ??
+                          Bundle.module.url(forResource: "clawd", withExtension: "png"),
                let nsImage = NSImage(contentsOf: url) {
                 let _ = nsImage.size = NSSize(width: 36, height: 36)
                 Image(nsImage: nsImage)
