@@ -46,7 +46,7 @@ struct UsageMenuView: View {
             }
             Spacer()
             Button {
-                monitor.refresh()
+                monitor.refresh(bypassThrottle: true)
             } label: {
                 Image(systemName: "arrow.clockwise")
             }

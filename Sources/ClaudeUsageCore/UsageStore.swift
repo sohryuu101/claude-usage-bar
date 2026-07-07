@@ -24,17 +24,30 @@ public struct UsageStore: @unchecked Sendable {
         self.oauthClient = oauthClient
     }
 
+    private static var lastOAuthFetchTime: Date?
+
     public func load(now: Date = Date()) -> UsageAggregate {
         loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unavailable)
     }
 
-    public func loadAsync(now: Date = Date()) async -> UsageAggregate {
+    public func loadAsync(bypassThrottle: Bool = false, now: Date = Date()) async -> UsageAggregate {
         guard enableOAuthLiveQuota, let token = oauthCredentialProvider.accessToken() else {
             return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unavailable)
         }
 
+        // Throttle active network calls to once every 1 hour (3600 seconds) unless bypassed
+        if !bypassThrottle, let lastFetch = Self.lastOAuthFetchTime, now.timeIntervalSince(lastFetch) < 3600 {
+            var cached: OAuthUsageSnapshot? = nil
+            if let data = UserDefaults.standard.data(forKey: "cachedLiveQuota"),
+               let saved = try? JSONDecoder().decode(OAuthUsageSnapshot.self, from: data) {
+                cached = saved
+            }
+            return loadLocal(now: now, liveQuota: cached, liveQuotaStatus: .enabled)
+        }
+
         do {
             let liveQuota = try await oauthClient.fetchUsage(accessToken: token, now: now)
+            Self.lastOAuthFetchTime = now
             if let data = try? JSONEncoder().encode(liveQuota) {
                 UserDefaults.standard.set(data, forKey: "cachedLiveQuota")
             }

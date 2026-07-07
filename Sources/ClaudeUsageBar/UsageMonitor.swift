@@ -84,12 +84,12 @@ final class UsageMonitor: ObservableObject {
         }
     }
 
-    func refresh() {
+    func refresh(bypassThrottle: Bool = false) {
         store.enableOAuthLiveQuota = enableOAuthLiveQuota
         let store = self.store
         Task {
             let newAggregate = await Task.detached {
-                return await store.loadAsync()
+                return await store.loadAsync(bypassThrottle: bypassThrottle)
             }.value
             self.aggregate = newAggregate
         }
