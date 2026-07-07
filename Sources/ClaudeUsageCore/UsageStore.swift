@@ -45,6 +45,12 @@ public struct UsageStore: @unchecked Sendable {
         }
     }
 
+    public func resetKeychainAccess() {
+        #if os(macOS)
+        ClaudeCodeOAuthCredentialProvider.isKeychainAccessDenied = false
+        #endif
+    }
+
     private func loadLocal(
         now: Date,
         liveQuota: OAuthUsageSnapshot?,
@@ -55,6 +61,21 @@ public struct UsageStore: @unchecked Sendable {
         let primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
         let designSnapshot = snapshots.first { $0.kind == .designAllowance }
         let subSnapshot = snapshots.first { $0.kind == .subscriptionStatus }
+        
+        var plan = oauthCredentialProvider.getPlanType()
+        if plan == nil {
+            if liveQuota?.extraUsage?.isEnabled == true {
+                plan = .enterprise
+            } else if let subPlan = subSnapshot?.plan?.lowercased() {
+                if subPlan.contains("pro") {
+                    plan = .pro
+                } else if subPlan.contains("free") {
+                    plan = .free
+                }
+            }
+        }
+        let planType = plan ?? .free
+
         return UsageAggregator().aggregate(
             records: records,
             accountSnapshot: primarySnapshot,
@@ -62,6 +83,7 @@ public struct UsageStore: @unchecked Sendable {
             subscriptionSnapshot: subSnapshot,
             liveQuota: liveQuota,
             liveQuotaStatus: liveQuotaStatus,
+            planType: planType,
             now: now
         )
     }

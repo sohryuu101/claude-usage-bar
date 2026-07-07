@@ -14,6 +14,7 @@ public struct UsageAggregator: Sendable {
         subscriptionSnapshot: CacheSnapshot? = nil,
         liveQuota: OAuthUsageSnapshot? = nil,
         liveQuotaStatus: OAuthLiveQuotaStatus = .unavailable,
+        planType: PlanType = .free,
         now: Date = Date()
     ) -> UsageAggregate {
         var today = UsageBucket()
@@ -49,6 +50,7 @@ public struct UsageAggregator: Sendable {
             subscriptionSnapshot: subscriptionSnapshot,
             liveQuota: liveQuota,
             liveQuotaStatus: liveQuotaStatus,
+            planType: planType,
             refreshedAt: now
         )
     }

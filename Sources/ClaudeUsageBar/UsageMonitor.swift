@@ -7,6 +7,7 @@ final class UsageMonitor: ObservableObject {
     @Published var enableOAuthLiveQuota: Bool {
         didSet {
             if oldValue != enableOAuthLiveQuota {
+                store.resetKeychainAccess()
                 refresh()
             }
         }
@@ -29,6 +30,23 @@ final class UsageMonitor: ObservableObject {
     }
 
     var menuTitle: String {
+        let plan = aggregate.planType
+        if plan == .enterprise {
+            if let extraUsage = aggregate.liveQuota?.extraUsage, extraUsage.isEnabled {
+                if let utilization = extraUsage.utilization {
+                    return "\(Int(utilization.rounded()))%"
+                }
+                if let used = extraUsage.usedCredits, let limit = extraUsage.monthlyLimit, limit > 0 {
+                    let percent = Int((used / limit * 100).rounded())
+                    return "\(percent)%"
+                }
+            }
+            if let snapshot = aggregate.accountSnapshot {
+                return "\(snapshot.percentUsed)%"
+            }
+            return "\(formatCompact(aggregate.today.tokens.total))"
+        }
+
         if let fiveHour = aggregate.liveQuota?.fiveHour {
             return "\(Int(fiveHour.utilization.rounded()))%"
         }

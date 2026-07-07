@@ -57,82 +57,124 @@ struct UsageMenuView: View {
 
     @ViewBuilder
     private var accountSection: some View {
+        let plan = monitor.aggregate.planType
+        
         VStack(alignment: .leading, spacing: 14) {
-            if let liveQuota = monitor.aggregate.liveQuota {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Live Quota")
-                        .font(.headline)
-                    quotaRow("5-hour", bucket: liveQuota.fiveHour)
-                    quotaRow("7-day", bucket: liveQuota.sevenDay)
-                    quotaRow("OAuth apps", bucket: liveQuota.sevenDayOAuthApps)
-                    quotaRow("Opus", bucket: liveQuota.sevenDayOpus)
-                    quotaRow("Sonnet", bucket: liveQuota.sevenDaySonnet)
-                    Text("Fetched \(liveQuota.fetchedAt.formatted(date: .omitted, time: .standard))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let snapshot = monitor.aggregate.accountSnapshot {
-                if monitor.aggregate.liveQuota != nil {
-                    Divider()
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    row(title: "\(snapshot.kind.rawValue) Cache", value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
-                    ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
-                        .tint(snapshot.percentUsed > 80 ? .orange : .blue)
-                    if let capturedAt = snapshot.capturedAt {
-                        Text("Stale fallback from \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
+            if plan == .enterprise {
+                // Enterprise Plan: Show Enterprise Spend Quota
+                if let liveQuota = monitor.aggregate.liveQuota,
+                   let extraUsage = liveQuota.extraUsage,
+                   extraUsage.isEnabled {
+                    
+                    let used = (extraUsage.usedCredits ?? 0.0) / 100.0
+                    let limit = (extraUsage.monthlyLimit ?? 0.0) / 100.0
+                    let percent = limit > 0 ? Int((used / limit * 100).rounded()) : 0
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        row(title: "Enterprise Usage", value: "$\(formatNumber(used)) of $\(formatNumber(limit)) (\(percent)%)")
+                        ProgressView(value: used, total: max(limit, 1))
+                            .tint(percent > 80 ? .orange : .blue)
+                        Text("Fetched \(liveQuota.fetchedAt.formatted(date: .omitted, time: .standard))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let snapshot = monitor.aggregate.accountSnapshot {
+                    VStack(alignment: .leading, spacing: 6) {
+                        row(title: "Usage Cache", value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
+                        ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
+                            .tint(snapshot.percentUsed > 80 ? .orange : .blue)
+                        if let capturedAt = snapshot.capturedAt {
+                            Text("Stale fallback from \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        row(title: "Enterprise Quota", value: "Unavailable")
+                        Text("Open Claude settings usage once to refresh the local app cache.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
+            } else {
+                // Pro or Free Plan: Show Live Quota, designSnapshot, and subscriptionSnapshot
+                if let liveQuota = monitor.aggregate.liveQuota {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Live Quota")
+                            .font(.headline)
+                        quotaRow("5-hour", bucket: liveQuota.fiveHour)
+                        quotaRow("7-day", bucket: liveQuota.sevenDay)
+                        quotaRow("OAuth apps", bucket: liveQuota.sevenDayOAuthApps)
+                        quotaRow("Opus", bucket: liveQuota.sevenDayOpus)
+                        quotaRow("Sonnet", bucket: liveQuota.sevenDaySonnet)
+                        Text("Fetched \(liveQuota.fetchedAt.formatted(date: .omitted, time: .standard))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
-            if let design = monitor.aggregate.designSnapshot {
-                if monitor.aggregate.accountSnapshot != nil || monitor.aggregate.liveQuota != nil {
-                    Divider()
+                if let snapshot = monitor.aggregate.accountSnapshot {
+                    if monitor.aggregate.liveQuota != nil {
+                        Divider()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        row(title: "\(snapshot.kind.rawValue) Cache", value: "$\(formatNumber(snapshot.used)) of $\(formatNumber(snapshot.limit)) (\(snapshot.percentUsed)%)")
+                        ProgressView(value: snapshot.used, total: max(snapshot.limit, 1))
+                            .tint(snapshot.percentUsed > 80 ? .orange : .blue)
+                        if let capturedAt = snapshot.capturedAt {
+                            Text("Stale fallback from \(capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    row(title: design.kind.rawValue, value: "\(design.percentUsed)% used")
-                    ProgressView(value: design.used, total: max(design.limit, 1))
-                        .tint(design.percentUsed >= 100 ? .red : .purple)
-                    Text("Included allowance for Claude Design (Canvas)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
 
-            let showSub = monitor.aggregate.subscriptionSnapshot != nil || monitor.aggregate.last5Hours.messages > 0
-            if showSub {
-                if monitor.aggregate.accountSnapshot != nil ||
-                    monitor.aggregate.designSnapshot != nil ||
-                    monitor.aggregate.liveQuota != nil {
-                    Divider()
+                if let design = monitor.aggregate.designSnapshot {
+                    if monitor.aggregate.accountSnapshot != nil || monitor.aggregate.liveQuota != nil {
+                        Divider()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        row(title: design.kind.rawValue, value: "\(design.percentUsed)% used")
+                        ProgressView(value: design.used, total: max(design.limit, 1))
+                            .tint(design.percentUsed >= 100 ? .red : .purple)
+                        Text("Included allowance for Claude Design (Canvas)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                let planName = monitor.aggregate.subscriptionSnapshot?.plan?.capitalized ?? "Pro"
-                let messagesUsed = monitor.aggregate.last5Hours.messages
-                let limit = estimated5HourLimit(for: monitor.aggregate.subscriptionSnapshot?.plan)
-                let percent = limit > 0 ? Int((Double(messagesUsed) / Double(limit) * 100).rounded()) : 0
-                VStack(alignment: .leading, spacing: 6) {
-                    row(title: "Claude \(planName)", value: "\(messagesUsed) of \(limit) messages (\(percent)%)")
-                    ProgressView(value: Double(messagesUsed), total: Double(max(limit, 1)))
-                        .tint(planColor(for: monitor.aggregate.subscriptionSnapshot?.plan, used: messagesUsed, total: limit))
-                    Text("Sliding 5-hour message quota (local estimate)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
 
-            if monitor.aggregate.accountSnapshot == nil &&
-               monitor.aggregate.designSnapshot == nil &&
-               monitor.aggregate.liveQuota == nil &&
-               !showSub {
-                VStack(alignment: .leading, spacing: 4) {
-                    row(title: "Account Quota", value: "Unavailable")
-                    Text("Open Claude settings usage once to refresh the local app cache.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                let showSub = monitor.aggregate.subscriptionSnapshot != nil || monitor.aggregate.last5Hours.messages > 0
+                if showSub {
+                    if monitor.aggregate.accountSnapshot != nil ||
+                        monitor.aggregate.designSnapshot != nil ||
+                        monitor.aggregate.liveQuota != nil {
+                        Divider()
+                    }
+                    let planName = monitor.aggregate.subscriptionSnapshot?.plan?.capitalized ?? "Pro"
+                    let messagesUsed = monitor.aggregate.last5Hours.messages
+                    let limit = estimated5HourLimit(for: monitor.aggregate.subscriptionSnapshot?.plan)
+                    let percent = limit > 0 ? Int((Double(messagesUsed) / Double(limit) * 100).rounded()) : 0
+                    VStack(alignment: .leading, spacing: 6) {
+                        row(title: "Claude \(planName)", value: "\(messagesUsed) of \(limit) messages (\(percent)%)")
+                        ProgressView(value: Double(messagesUsed), total: Double(max(limit, 1)))
+                            .tint(planColor(for: monitor.aggregate.subscriptionSnapshot?.plan, used: messagesUsed, total: limit))
+                        Text("Sliding 5-hour message quota (local estimate)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if monitor.aggregate.accountSnapshot == nil &&
+                   monitor.aggregate.designSnapshot == nil &&
+                   monitor.aggregate.liveQuota == nil &&
+                   !showSub {
+                    VStack(alignment: .leading, spacing: 4) {
+                        row(title: "Account Quota", value: "Unavailable")
+                        Text("Open Claude settings usage once to refresh the local app cache.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

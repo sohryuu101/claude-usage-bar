@@ -101,6 +101,12 @@ public struct UsageBucket: Equatable, Sendable {
     }
 }
 
+public enum PlanType: String, Codable, Sendable {
+    case free
+    case pro
+    case enterprise
+}
+
 public struct UsageAggregate: Equatable, Sendable {
     public var today: UsageBucket
     public var month: UsageBucket
@@ -112,6 +118,7 @@ public struct UsageAggregate: Equatable, Sendable {
     public var subscriptionSnapshot: CacheSnapshot?
     public var liveQuota: OAuthUsageSnapshot?
     public var liveQuotaStatus: OAuthLiveQuotaStatus
+    public var planType: PlanType
     public var refreshedAt: Date
 
     public init(
@@ -125,6 +132,7 @@ public struct UsageAggregate: Equatable, Sendable {
         subscriptionSnapshot: CacheSnapshot? = nil,
         liveQuota: OAuthUsageSnapshot? = nil,
         liveQuotaStatus: OAuthLiveQuotaStatus = .unavailable,
+        planType: PlanType = .free,
         refreshedAt: Date = Date()
     ) {
         self.today = today
@@ -137,6 +145,7 @@ public struct UsageAggregate: Equatable, Sendable {
         self.subscriptionSnapshot = subscriptionSnapshot
         self.liveQuota = liveQuota
         self.liveQuotaStatus = liveQuotaStatus
+        self.planType = planType
         self.refreshedAt = refreshedAt
     }
 }
@@ -158,12 +167,27 @@ public struct OAuthQuotaBucket: Equatable, Sendable {
     }
 }
 
+public struct OAuthExtraUsage: Equatable, Sendable {
+    public var isEnabled: Bool
+    public var monthlyLimit: Double? // in cents
+    public var usedCredits: Double? // in cents
+    public var utilization: Double? // percentage
+
+    public init(isEnabled: Bool, monthlyLimit: Double? = nil, usedCredits: Double? = nil, utilization: Double? = nil) {
+        self.isEnabled = isEnabled
+        self.monthlyLimit = monthlyLimit
+        self.usedCredits = usedCredits
+        self.utilization = utilization
+    }
+}
+
 public struct OAuthUsageSnapshot: Equatable, Sendable {
     public var fiveHour: OAuthQuotaBucket?
     public var sevenDay: OAuthQuotaBucket?
     public var sevenDayOAuthApps: OAuthQuotaBucket?
     public var sevenDayOpus: OAuthQuotaBucket?
     public var sevenDaySonnet: OAuthQuotaBucket?
+    public var extraUsage: OAuthExtraUsage?
     public var fetchedAt: Date
 
     public init(
@@ -172,6 +196,7 @@ public struct OAuthUsageSnapshot: Equatable, Sendable {
         sevenDayOAuthApps: OAuthQuotaBucket? = nil,
         sevenDayOpus: OAuthQuotaBucket? = nil,
         sevenDaySonnet: OAuthQuotaBucket? = nil,
+        extraUsage: OAuthExtraUsage? = nil,
         fetchedAt: Date
     ) {
         self.fiveHour = fiveHour
@@ -179,6 +204,7 @@ public struct OAuthUsageSnapshot: Equatable, Sendable {
         self.sevenDayOAuthApps = sevenDayOAuthApps
         self.sevenDayOpus = sevenDayOpus
         self.sevenDaySonnet = sevenDaySonnet
+        self.extraUsage = extraUsage
         self.fetchedAt = fetchedAt
     }
 }

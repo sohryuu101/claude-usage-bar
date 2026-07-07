@@ -13,6 +13,7 @@ public protocol OAuthUsageClient: Sendable {
 
 public protocol OAuthCredentialProvider: Sendable {
     func accessToken() -> String?
+    func getPlanType() -> PlanType?
 }
 
 public struct StaticOAuthCredentialProvider: OAuthCredentialProvider {
@@ -25,12 +26,18 @@ public struct StaticOAuthCredentialProvider: OAuthCredentialProvider {
     public func accessToken() -> String? {
         token
     }
+
+    public func getPlanType() -> PlanType? {
+        nil
+    }
 }
 
 public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unchecked Sendable {
     public var homeDirectory: URL
     public var environment: [String: String]
     public var fileManager: FileManager
+
+    public static var isKeychainAccessDenied = false
 
     public init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -44,7 +51,7 @@ public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unche
 
     public func accessToken() -> String? {
         #if os(macOS)
-        if let token = fetchTokenFromKeychain() {
+        if !Self.isKeychainAccessDenied, let token = fetchTokenFromKeychain() {
             return token
         }
         #endif
@@ -62,6 +69,38 @@ public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unche
         return nil
     }
 
+    public func getPlanType() -> PlanType? {
+        let file = homeDirectory.appendingPathComponent(".claude.json")
+        guard fileManager.fileExists(atPath: file.path),
+              let data = try? Data(contentsOf: file),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return nil
+        }
+        
+        if let oauthAccount = json["oauthAccount"] as? [String: Any] {
+            if let seatTier = oauthAccount["seatTier"] as? String {
+                let lower = seatTier.lowercased()
+                if lower.contains("enterprise") {
+                    return .enterprise
+                }
+                if lower.contains("pro") {
+                    return .pro
+                }
+            }
+            if let billingType = oauthAccount["billingType"] as? String {
+                let lower = billingType.lowercased()
+                if lower.contains("contracted") || lower.contains("enterprise") {
+                    return .enterprise
+                }
+                if lower.contains("pro") {
+                    return .pro
+                }
+            }
+        }
+        return nil
+    }
+
     #if os(macOS)
     private func fetchTokenFromKeychain() -> String? {
         let query: [String: Any] = [
@@ -74,8 +113,14 @@ public struct ClaudeCodeOAuthCredentialProvider: OAuthCredentialProvider, @unche
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
         
-        guard status == errSecSuccess,
-              let data = dataTypeRef as? Data,
+        if status != errSecSuccess {
+            if status != errSecItemNotFound {
+                Self.isKeychainAccessDenied = true
+            }
+            return nil
+        }
+        
+        guard let data = dataTypeRef as? Data,
               let object = try? JSONSerialization.jsonObject(with: data)
         else {
             return nil
@@ -191,6 +236,7 @@ private struct OAuthUsageResponse: Decodable {
     var sevenDayOAuthApps: OAuthQuotaBucketResponse?
     var sevenDayOpus: OAuthQuotaBucketResponse?
     var sevenDaySonnet: OAuthQuotaBucketResponse?
+    var extraUsage: OAuthExtraUsageResponse?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -198,6 +244,7 @@ private struct OAuthUsageResponse: Decodable {
         case sevenDayOAuthApps = "seven_day_oauth_apps"
         case sevenDayOpus = "seven_day_opus"
         case sevenDaySonnet = "seven_day_sonnet"
+        case extraUsage = "extra_usage"
     }
 
     func snapshot(fetchedAt: Date) -> OAuthUsageSnapshot {
@@ -207,7 +254,31 @@ private struct OAuthUsageResponse: Decodable {
             sevenDayOAuthApps: sevenDayOAuthApps?.bucket,
             sevenDayOpus: sevenDayOpus?.bucket,
             sevenDaySonnet: sevenDaySonnet?.bucket,
+            extraUsage: extraUsage?.extraUsage,
             fetchedAt: fetchedAt
+        )
+    }
+}
+
+private struct OAuthExtraUsageResponse: Decodable {
+    var isEnabled: Bool?
+    var monthlyLimit: Double?
+    var usedCredits: Double?
+    var utilization: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case isEnabled = "is_enabled"
+        case monthlyLimit = "monthly_limit"
+        case usedCredits = "used_credits"
+        case utilization = "utilization"
+    }
+
+    var extraUsage: OAuthExtraUsage {
+        OAuthExtraUsage(
+            isEnabled: isEnabled ?? false,
+            monthlyLimit: monthlyLimit,
+            usedCredits: usedCredits,
+            utilization: utilization
         )
     }
 }
