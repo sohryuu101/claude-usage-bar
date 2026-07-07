@@ -21,8 +21,9 @@ final class UsageMonitor: ObservableObject {
         self.aggregate = UsageAggregator().aggregate(records: [])
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor in
-                self?.refresh()
+                self.refresh()
             }
         }
     }
