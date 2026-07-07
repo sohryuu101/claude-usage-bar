@@ -157,7 +157,7 @@ public enum OAuthLiveQuotaStatus: Equatable, Sendable {
     case rateLimited
 }
 
-public struct OAuthQuotaBucket: Equatable, Sendable {
+public struct OAuthQuotaBucket: Codable, Equatable, Sendable {
     public var utilization: Double
     public var resetsAt: Date?
 
@@ -167,7 +167,7 @@ public struct OAuthQuotaBucket: Equatable, Sendable {
     }
 }
 
-public struct OAuthExtraUsage: Equatable, Sendable {
+public struct OAuthExtraUsage: Codable, Equatable, Sendable {
     public var isEnabled: Bool
     public var monthlyLimit: Double? // in cents
     public var usedCredits: Double? // in cents
@@ -181,7 +181,7 @@ public struct OAuthExtraUsage: Equatable, Sendable {
     }
 }
 
-public struct OAuthUsageSnapshot: Equatable, Sendable {
+public struct OAuthUsageSnapshot: Codable, Equatable, Sendable {
     public var fiveHour: OAuthQuotaBucket?
     public var sevenDay: OAuthQuotaBucket?
     public var sevenDayOAuthApps: OAuthQuotaBucket?

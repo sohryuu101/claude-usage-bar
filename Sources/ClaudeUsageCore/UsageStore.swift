@@ -35,6 +35,9 @@ public struct UsageStore: @unchecked Sendable {
 
         do {
             let liveQuota = try await oauthClient.fetchUsage(accessToken: token, now: now)
+            if let data = try? JSONEncoder().encode(liveQuota) {
+                UserDefaults.standard.set(data, forKey: "cachedLiveQuota")
+            }
             return loadLocal(now: now, liveQuota: liveQuota, liveQuotaStatus: .enabled)
         } catch OAuthUsageError.unauthorized {
             return loadLocal(now: now, liveQuota: nil, liveQuotaStatus: .unauthorized)
@@ -58,13 +61,38 @@ public struct UsageStore: @unchecked Sendable {
     ) -> UsageAggregate {
         let records = loadRecords()
         let snapshots = loadAccountSnapshots()
-        let primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
+        var primarySnapshot = snapshots.first { $0.kind == .runBudget || $0.kind == .usage }
         let designSnapshot = snapshots.first { $0.kind == .designAllowance }
         let subSnapshot = snapshots.first { $0.kind == .subscriptionStatus }
         
+        var liveQuotaFallback: OAuthUsageSnapshot? = nil
+        if let data = UserDefaults.standard.data(forKey: "cachedLiveQuota"),
+           let saved = try? JSONDecoder().decode(OAuthUsageSnapshot.self, from: data) {
+            liveQuotaFallback = saved
+        }
+        
+        if let fallback = liveQuotaFallback, fallback.extraUsage?.isEnabled == true {
+            let used = (fallback.extraUsage?.usedCredits ?? 0.0) / 100.0
+            let limit = (fallback.extraUsage?.monthlyLimit ?? 0.0) / 100.0
+            let fallbackSnapshot = CacheSnapshot(
+                kind: .usage,
+                used: used,
+                limit: limit,
+                capturedAt: fallback.fetchedAt
+            )
+            
+            if let primary = primarySnapshot, let primaryDate = primary.capturedAt {
+                if fallback.fetchedAt > primaryDate {
+                    primarySnapshot = fallbackSnapshot
+                }
+            } else {
+                primarySnapshot = fallbackSnapshot
+            }
+        }
+        
         var plan = oauthCredentialProvider.getPlanType()
         if plan == nil {
-            if liveQuota?.extraUsage?.isEnabled == true {
+            if liveQuota?.extraUsage?.isEnabled == true || liveQuotaFallback?.extraUsage?.isEnabled == true {
                 plan = .enterprise
             } else if let subPlan = subSnapshot?.plan?.lowercased() {
                 if subPlan.contains("pro") {
